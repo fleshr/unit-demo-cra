@@ -1,0 +1,86 @@
+name: Release
+on:
+  push:
+    tags:
+      - v[0-9]+
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AUTHOR: ${{ github.actor }}
+      ISSUE_NAME: ${{ github.ref_name }}
+      ISSUE_URL: ""
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ env.ISSUE_NAME }}
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Generating issue text
+        run: |
+          DATE=$(git log -1 --pretty="format:%cd" --date=format:"%H:%M:%S %d.%m.%Y")
+
+          CURR_VER=$(( ${ISSUE_NAME:1} ))
+          PREV_VER=$(( ${ISSUE_NAME:1} - 1 ))
+
+          if [[ $PREV_VER == 0 ]]
+          then
+            CHANGELOG=$(git log v$CURR_VER...$(git rev-list --max-parents=0 HEAD) --pretty=format:%s | awk '{print  "-", $0}')
+          else
+            CHANGELOG=$(git log v$CURR_VER...v$PREV_VER --pretty=format:%s | awk '{print  "-", $0}')
+          fi
+
+          cat ./.github/ISSUE_TEMPLATE.md | sed "s/{AUTHOR}/$AUTHOR/g;s/{DATE}/$DATE/g;s/{VERSION}/$ISSUE_NAME/g;s/{CHANGELOG}/${CHANGELOG//$'\n'/\\n}/g" > release.md
+
+      - name: Checking for existing issue
+        run: |
+          ISSUE_URL=$(gh issue list --json url --jq ".[].url" --state "all" --limit 1 --search "$ISSUE_NAME in:title")
+          echo "ISSUE_URL=$ISSUE_URL" >> $GITHUB_ENV
+
+      - name: Editing existing issue
+        if: ${{ env.ISSUE_URL != '' }}
+        run: gh issue edit $ISSUE_URL --body-file ./release.md
+
+      - name: Creating new issue
+        if: ${{ env.ISSUE_URL == '' }}
+        run: |
+          ISSUE_URL=$(gh issue create --label "RELEASE" --title "$ISSUE_NAME" --body-file ./release.md)
+          echo "ISSUE_URL=$ISSUE_URL" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Unit tests
+        run: npm run test-ci
+
+      - name: Run E2E tests
+        run: npm run e2e-ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install gh-pages
+        run: npm i gh-pages
+
+      - name: Deploy with gh-pages
+        run: |
+          git remote set-url origin https://git:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
+          npx gh-pages -d build -u "github-actions-bot <support+actions@github.com>"
+
+      - name: Adding comment to issue about successful completion
+        run: gh issue comment $ISSUE_URL --body "Tests passed successfully and build deployed with gh-pages"
+
+      - name: Closing issue
+        run: gh issue close $ISSUE_URL
