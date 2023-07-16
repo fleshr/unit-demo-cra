@@ -48,7 +48,9 @@ jobs:
 
       - name: Editing existing issue
         if: ${{ env.ISSUE_URL != '' }}
-        run: gh issue edit $ISSUE_URL --body-file ./release.md
+        run: |
+          gh issue reopen $ISSUE_URL
+          gh issue edit $ISSUE_URL --body-file ./release.md
 
       - name: Creating new issue
         if: ${{ env.ISSUE_URL == '' }}
