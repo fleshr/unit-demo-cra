@@ -68,6 +68,14 @@ const config: PlaywrightTestConfig = {
       },
     },
 
+    {
+      name: "chromium-headless",
+      use: {
+        ...devices["Desktop Chrome"],
+        headless: true,
+      },
+    },
+
     /* Test against mobile viewports. */
     // {
     //   name: 'Mobile Chrome',
