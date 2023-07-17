@@ -39,7 +39,7 @@ jobs:
             CHANGELOG=$(git log v$CURR_VER...v$PREV_VER --pretty=format:%s | awk '{print  "-", $0}')
           fi
 
-          cat ./.github/ISSUE_TEMPLATE.md | sed "s/{AUTHOR}/$AUTHOR/g;s/{DATE}/$DATE/g;s/{VERSION}/$ISSUE_NAME/g;s/{CHANGELOG}/${CHANGELOG//$'\n'/\\n}/g" > release.md
+          cat ./.github/ISSUE_TEMPLATE.md | sed "s/{AUTHOR}/$AUTHOR/g;s/{DATE}/$DATE/g;s/{VERSION}/$ISSUE_NAME/g;s~{CHANGELOG}~${CHANGELOG//$'\n'/\\n}~g" > release.md
 
       - name: Checking for existing issue
         run: |
